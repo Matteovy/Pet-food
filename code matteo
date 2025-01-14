@@ -1,0 +1,336 @@
+import pandas as pd 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Charger les fichiers CSV
+buy = "C:\\Users\\Tanguy\\Documents\\updated2_dataset_with_attributed_time.csv"
+view = "C:\\Users\\Tanguy\\Documents\\viewonly_data.csv"
+
+df_buy = pd.read_csv(buy)
+df_view = pd.read_csv(view)
+
+customer_ids_buy = df_buy['customer_id'].unique()
+df_view = df_view[~df_view['customer_id'].isin(customer_ids_buy)]
+
+df_buy['attributed_time'] = pd.to_datetime(df_buy['attributed_time'], errors='coerce')
+df_buy = df_buy.dropna(subset=['attributed_time'])
+
+df_buy['day_of_week'] = df_buy['attributed_time'].dt.dayofweek  # 0 = Lundi, 6 = Dimanche
+df_buy['hour_of_day'] = df_buy['attributed_time'].dt.hour  # Extrait l'heure de la journée
+
+heatmap_data_buy = df_buy.pivot_table(index='day_of_week', columns='hour_of_day', aggfunc='size', fill_value=0)
+
+heatmap_data_buy_ratio = heatmap_data_buy*100 / heatmap_data_buy.values.sum()
+
+df_view['attributed_time'] = pd.to_datetime(df_view['attributed_time'], errors='coerce')
+df_view = df_view.dropna(subset=['attributed_time'])
+
+df_view['day_of_week'] = df_view['attributed_time'].dt.dayofweek
+df_view['hour_of_day'] = df_view['attributed_time'].dt.hour
+
+heatmap_data_view = df_view.pivot_table(index='day_of_week', columns='hour_of_day', aggfunc='size', fill_value=0)
+
+heatmap_data_view_ratio = heatmap_data_view*100  / heatmap_data_view.values.sum()
+
+heatmap_data_ratio = heatmap_data_buy_ratio - heatmap_data_view_ratio
+plt.figure(figsize=(20, 10))  # Augmente la taille de la figure
+
+# Heatmap des proportions d'achats
+sns.heatmap(heatmap_data_buy_ratio, 
+            cmap="YlGnBu", 
+            annot=True, 
+            fmt=".2f", 
+            cbar_kws={'label': 'Proportion d\'achats'}, 
+            linewidths=0.5)  # Ajoute des séparateurs
+plt.title("Achats (Normalisés) par jour et heure", fontsize=18)
+plt.xlabel("Heure de la journée", fontsize=14)
+plt.ylabel("Jour de la semaine (0=Lundi, 6=Dimanche)", fontsize=14)
+plt.show()
+
+# Heatmap des proportions de vues
+plt.figure(figsize=(20, 10))  # Augmente la taille de la figure
+sns.heatmap(heatmap_data_view_ratio, 
+            cmap="YlGnBu", 
+            annot=True, 
+            fmt=".2f", 
+            cbar_kws={'label': 'Proportion de vues'}, 
+            linewidths=0.5)
+plt.title("Vues (Normalisées) par jour et heure", fontsize=18)
+plt.xlabel("Heure de la journée", fontsize=14)
+plt.ylabel("Jour de la semaine (0=Lundi, 6=Dimanche)", fontsize=14)
+plt.show()
+
+# Heatmap des différences de proportions
+plt.figure(figsize=(20, 10))  # Augmente la taille de la figure
+sns.heatmap(heatmap_data_ratio, 
+            cmap="coolwarm", 
+            annot=True, 
+            fmt=".2f", 
+            cbar_kws={'label': 'Différence (Proportion)'}, 
+            linewidths=0.5)
+plt.title("Différence Proportion Achats - Vues", fontsize=18)
+plt.xlabel("Heure de la journée", fontsize=14)
+plt.ylabel("Jour de la semaine (0=Lundi, 6=Dimanche)", fontsize=14)
+plt.show()
+# %% Ajouter une colonne combin
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Charger les fichiers CSV
+buy = "C:\\Users\\Tanguy\\Documents\\updated2_dataset_with_attributed_time.csv"
+view = "C:\\Users\\Tanguy\\Documents\\viewonly_data.csv"
+
+df_buy = pd.read_csv(buy)
+df_view = pd.read_csv(view)
+# %% création # Remove rows where 'timestamp_utc_1.x' or 'timestamp_utc_1.y' are empty (NaN)
+df_buy_cleaned = df_buy.dropna(subset=['timestamp_utc_1.x', 'timestamp_utc_1.y'])
+
+# Count the number of unique customers (customer_id)
+unique_customers = df_buy_cleaned['customer_id'].nunique()
+
+# Output the results
+print(f"Number of unique customers: {unique_customers}")
+# %% création 
+import pandas as pd
+
+# Fonction pour extraire le numéro de la colonne 'attributed_column'
+def create_combined(row):
+    # Vérifier si attributed_column est valide
+    if pd.notnull(row['attributed_campaign']):
+        # Extraire le numéro (X) depuis 'timestamp_utc_X.y'
+        try:
+            x = int(row['attributed_campaign'].split('_')[-1].split('.')[0])  # Extraire le X avant ".y"
+        except ValueError:
+            return None  # Retourner None si le format ne correspond pas
+
+        campaign_col = f"campaign_name_{x}"
+        device_col = f"device_type_{x}"
+
+        # Vérifier si ces colonnes existent
+        if campaign_col in row.index and device_col in row.index:
+            return f"{row[campaign_col]}_{row[device_col]}"
+    
+    # Si aucune condition n'est remplie, retourner une valeur par défaut ou NaN
+    return None
+
+# Appliquer la fonction à df_buy
+df_buy['combined'] = df_buy.apply(create_combined, axis=1)
+
+# Appliquer la fonction à df_view
+df_view['combined'] = df_view.apply(create_combined, axis=1)
+
+
+# Afficher un aperçu des données pour vérifier
+print("Aperçu des données de df_buy :")
+print(df_buy[['attributed_campaign', 'combined']].head())
+
+print("\nAperçu des données de df_view :")
+print(df_view[['attributed_campaign', 'combined']].head())
+
+# Compter les occurrences dans la colonne 'combined' de df_buy
+combined_counts_buy = df_buy['combined'].value_counts(dropna=False)
+
+# Compter les occurrences dans la colonne 'combined' de df_view
+combined_counts_view = df_view['combined'].value_counts(dropna=False)
+
+print("\nTableau des occurrences dans df_buy :")
+print(combined_counts_buy)
+
+print("\nTableau des occurrences dans df_view :")
+print(combined_counts_view)
+
+# %% Ajouter une colonne combinée
+df_buy['combined'] = df_buy['campaign_name_1'] + "_" + df_buy['device_type_1']
+df_view['combined'] = df_view['campaign_name_1'] + "_" + df_view['device_type_1']
+# Afficher un aperçu des premières lignes pour vérifier
+print(df_buy[['campaign_name_1', 'device_type_1', 'combined']].head())
+print(df_view[['campaign_name_1', 'device_type_1', 'combined']].head())
+
+# Compter les occurrences dans la colonne 'combined' de df_buy
+combined_counts_buy = df_buy['combined'].value_counts(dropna=False)
+
+# Compter les occurrences dans la colonne 'combined' de df_view
+combined_counts_view = df_view['combined'].value_counts(dropna=False)
+
+print("Tableau des occurrences dans df_buy:")
+print(combined_counts_buy)
+
+print("\nTableau des occurrences dans df_view:")
+print(combined_counts_view)
+# %% création histogramme
+# Compter les occurrences de chaque valeur dans la colonne 'combined'
+combined_counts = df_buy['combined'].value_counts(dropna=False)
+
+# Transformer en DataFrame pour faciliter la manipulation
+combined_counts_df = combined_counts.reset_index()
+combined_counts_df.columns = ['combined', 'count']
+
+print("Aperçu des données pour l'histogramme :")
+print(combined_counts_df.head())
+import matplotlib.pyplot as plt
+
+# Créer un histogramme (barplot)
+plt.figure(figsize=(20, 10))
+plt.bar(combined_counts_df['combined'], combined_counts_df['count'], color='skyblue')
+
+# Ajouter des labels et un titre
+plt.xlabel('Valeurs de Combined', fontsize=14)
+plt.ylabel('Nombre d\'occurrences', fontsize=14)
+plt.title('Histogramme des valeurs uniques dans Combined', fontsize=16)
+plt.xticks(rotation=45, ha='right')  # Rotation des étiquettes sur l'axe X pour les rendre lisibles
+plt.tight_layout()  # Ajuster l'espacement pour éviter les chevauchements
+plt.show()
+
+# %% création histogramme
+# Fonction pour calculer les occurrences pondérées
+def calculate_weighted_occurrences(df, info_column):
+    """
+    Calcule les occurrences pondérées des campagnes pour un DataFrame donné.
+    """
+    # Remplacer les valeurs NaN par une chaîne vide
+    df[info_column] = df[info_column].fillna('')
+
+    # Fonction pour pondérer les campagnes attribuées
+    def create_weighted_campaigns(row):
+        campaigns = row[info_column].split(', ') if row[info_column] else []
+        num_campaigns = len(campaigns)
+        if num_campaigns == 0:
+            return []
+        weight = 1 / num_campaigns
+        return [{'campaign_device': campaign, 'weight': weight} for campaign in campaigns]
+
+    # Appliquer la fonction pour générer un tableau pondéré
+    df['weighted_campaigns'] = df.apply(create_weighted_campaigns, axis=1)
+
+    # Transformer en DataFrame "explosé" pour analyser chaque campagne individuellement
+    weighted_data = df.explode('weighted_campaigns').dropna(subset=['weighted_campaigns'])
+
+    # Extraire les informations de la colonne 'weighted_campaigns'
+    weighted_data['campaign_device'] = weighted_data['weighted_campaigns'].apply(lambda x: x['campaign_device'])
+    weighted_data['weight'] = weighted_data['weighted_campaigns'].apply(lambda x: x['weight'])
+
+    # Compter les occurrences pondérées
+    weighted_counts = weighted_data.groupby('campaign_device')['weight'].sum().reset_index()
+    weighted_counts.columns = ['campaign_device', 'weighted_occurrences']
+
+    return weighted_counts
+
+# Calculer les occurrences pondérées pour les deux DataFrames
+buy_weighted_occurrences = calculate_weighted_occurrences(df_buy, 'campaign_device_info')
+view_weighted_occurrences = calculate_weighted_occurrences(df_view, 'campaign_device_info')
+
+# Sauvegarder les résultats
+buy_output_path = "C:\\Users\\Tanguy\\Documents\\buy_weighted_campaign_occurrences.csv"
+view_output_path = "C:\\Users\\Tanguy\\Documents\\view_weighted_campaign_occurrences.csv"
+
+buy_weighted_occurrences.to_csv(buy_output_path, index=False)
+view_weighted_occurrences.to_csv(view_output_path, index=False)
+# Identifier les colonnes des campagnes marketing
+marketing_columns_buy = [col for col in df_buy.columns if 'timestamp_utc_' in col]
+marketing_columns_view = [col for col in df_view.columns if 'timestamp_utc_' in col]
+
+# Convertir les colonnes en datetime
+df_buy['timestamp_utc'] = pd.to_datetime(df_buy['timestamp_utc'], errors='coerce')
+df_view['timestamp_utc'] = pd.to_datetime(df_view['timestamp_utc'], errors='coerce')
+df_buy[marketing_columns_buy] = df_buy[marketing_columns_buy].apply(pd.to_datetime, errors='coerce')
+df_view[marketing_columns_view] = df_view[marketing_columns_view].apply(pd.to_datetime, errors='coerce')
+# %% 
+# Fonction pour attribuer toutes les campagnes dans la fenêtre de 30 jours
+def find_all_marketing_attributions(data, transaction_col, marketing_cols, time_window_seconds):
+    results = []
+    for index, row in data.iterrows():
+        transaction_time = row[transaction_col]
+        campaigns_within_window = []
+        if pd.notna(transaction_time):
+            for col in marketing_cols:
+                campaign_time = row[col]
+                if pd.notna(campaign_time):
+                    time_diff = (transaction_time - campaign_time).total_seconds()
+                    if 0 <= time_diff <= time_window_seconds:
+                        campaigns_within_window.append(col)
+        results.append(','.join(campaigns_within_window))
+    return results
+
+# Appliquer la fonction
+time_window_seconds = 30 * 24 * 60 * 60
+df_buy['attributed_campaigns'] = find_all_marketing_attributions(
+    df_buy, 'timestamp_utc', marketing_columns_buy, time_window_seconds
+)
+df_view['attributed_campaigns'] = find_all_marketing_attributions(
+    df_view, 'timestamp_utc', marketing_columns_view, time_window_seconds
+)
+# %% 
+# Fonction mise à jour pour inclure les campagnes télé manquantes
+def create_weighted_combinations(row):
+    """
+    Crée une liste pondérée des combinaisons device_campaign.
+    Si campaign_name ou device_type sont vides, attribue des valeurs par défaut.
+    """
+    campaigns = row['attributed_campaign_list']
+    num_campaigns = len(campaigns)
+    if num_campaigns == 0:
+        return []
+    weight = 1 / num_campaigns
+    weighted_combinations = []
+    for campaign in campaigns:
+        try:
+            x = int(campaign.split('_')[-1].split('.')[0])
+            campaign_col = f"campaign_name_{x}"
+            device_col = f"device_type_{x}"
+            
+            # Vérifier si les colonnes existent et attribuer des valeurs par défaut si nécessaire
+            campaign_name = row.get(campaign_col, "Unknown")  # Default: "Unknown"
+            device_type = row.get(device_col, "TV")  # Default: "TV"
+            
+            # S'assurer que les valeurs ne sont pas NaN
+            campaign_name = campaign_name if pd.notna(campaign_name) else "Unknown"
+            device_type = device_type if pd.notna(device_type) else "TV"
+            
+            weighted_combinations.append({
+                'device_campaign': f"{device_type}_{campaign_name}",
+                'weight': weight
+            })
+        except (ValueError, KeyError):
+            continue
+    return weighted_combinations
+
+# Extraire et pondérer les combinaisons
+def extract_and_weight_campaigns(data):
+    data['attributed_campaigns'] = data['attributed_campaigns'].fillna('')
+    data['attributed_campaign_list'] = data['attributed_campaigns'].apply(lambda x: x.split(',') if x else [])
+
+    data['weighted_combinations'] = data.apply(create_weighted_combinations, axis=1)
+    weighted_data = data.explode('weighted_combinations').dropna(subset=['weighted_combinations'])
+    weighted_data['device_campaign'] = weighted_data['weighted_combinations'].apply(lambda x: x['device_campaign'])
+    weighted_data['weight'] = weighted_data['weighted_combinations'].apply(lambda x: x['weight'])
+
+    weighted_counts = weighted_data.groupby('device_campaign')['weight'].sum().reset_index()
+    weighted_counts.columns = ['device_campaign', 'weighted_occurrences']
+
+    return weighted_counts
+
+# Calculer les occurrences pondérées
+buy_weighted_occurrences = extract_and_weight_campaigns(df_buy)
+view_weighted_occurrences = extract_and_weight_campaigns(df_view)
+
+# Sauvegarder les résultats
+buy_weighted_occurrences.to_csv("buy_weighted_campaign_occurrences2.csv", index=False)
+view_weighted_occurrences.to_csv("view_weighted_campaign_occurrences.csv", index=False)
+# %% 
+# Résultats finaux
+print("Buy Weighted Campaign Occurrences:")
+print(buy_weighted_occurrences)
+print("View Weighted Campaign Occurrences:")
+print(view_weighted_occurrences)
+# %% 
+# Identifier les colonnes des campagnes marketing
+marketing_columns_buy = [col for col in df_buy.columns if 'timestamp_utc_' in col]
+marketing_columns_view = [col for col in df_view.columns if 'timestamp_utc_' in col]
+
+# Convertir les colonnes en datetime
+df_buy['timestamp_utc'] = pd.to_datetime(df_buy['timestamp_utc'], errors='coerce')
+df_view['timestamp_utc'] = pd.to_datetime(df_view['timestamp_utc'], errors='coerce')
+df_buy[marketing_columns_buy] = df_buy[marketing_columns_buy].apply(pd.to_datetime, errors='coerce')
+df_view[marketing_columns_view] = df_view[marketing_columns_view].apply(pd.to_datetime, errors='coerce')
+# %% 
